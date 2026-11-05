@@ -1,0 +1,110 @@
+
+clc;
+clear;
+close all;
+
+%% 1. Input parameters
+
+rng(7);
+
+N_bits = 50000;
+SNR_dB = 0:2:20;
+
+alpha1 = 0.75;       % Far user power allocation
+alpha2 = 1-alpha1;   % Near user power allocation
+
+ber_User1 = zeros(length(SNR_dB),1);
+ber_User2 = zeros(length(SNR_dB),1);
+ber_OFDMA = zeros(length(SNR_dB),1);
+
+%% 2. Simulation loop
+
+for s = 1:length(SNR_dB)
+
+    snr_linear = 10^(SNR_dB(s)/10);
+    noise_variance = 1/snr_linear;
+
+    % Generate random bits
+    bits_u1 = randi([0 1],N_bits,1);
+    bits_u2 = randi([0 1],N_bits,1);
+
+    % BPSK modulation
+    x1 = 2*bits_u1-1;
+    x2 = 2*bits_u2-1;
+
+    % NOMA superposition
+    x_noma = sqrt(alpha1)*x1 + sqrt(alpha2)*x2;
+
+    % AWGN channel
+    noise = sqrt(noise_variance/2) * ...
+        (randn(N_bits,1)+1i*randn(N_bits,1));
+
+    y_noma = real(x_noma+noise);
+
+    %% 3. Far user: ML detection with unknown near-user bit
+
+    candidate0 = sqrt(alpha1)*(-1) + ...
+                 sqrt(alpha2)*[-1 1];
+
+    candidate1 = sqrt(alpha1)*(1) + ...
+                 sqrt(alpha2)*[-1 1];
+
+    metric0 = min((y_noma-candidate0(1)).^2, ...
+                  (y_noma-candidate0(2)).^2);
+
+    metric1 = min((y_noma-candidate1(1)).^2, ...
+                  (y_noma-candidate1(2)).^2);
+
+    dec_u1 = metric1 < metric0;
+
+    ber_User1(s) = mean(dec_u1 ~= bits_u1);
+
+    %% 4. Near user: SIC receiver
+
+    % Decode far-user signal first
+    dec_far = dec_u1;
+
+    est_x1 = 2*dec_far-1;
+
+    % Subtract estimated far-user signal
+    y_sic = y_noma-sqrt(alpha1)*est_x1;
+
+    % Decode near-user signal
+    dec_u2 = y_sic > 0;
+
+    ber_User2(s) = mean(dec_u2 ~= bits_u2);
+
+    %% 5. OFDMA benchmark
+
+    y_ofdma = x1+sqrt(noise_variance)*randn(N_bits,1);
+
+    dec_ofdma = y_ofdma > 0;
+
+    ber_OFDMA(s) = mean(dec_ofdma ~= bits_u1);
+
+end
+
+%% 6. Plot BER performance
+
+figure('Name','NOMA and OFDMA BER Comparison');
+
+semilogy(SNR_dB,ber_User1,'ro-','LineWidth',1.5);
+
+hold on;
+
+semilogy(SNR_dB,ber_User2,'bs-','LineWidth',1.5);
+
+semilogy(SNR_dB,ber_OFDMA,'k--','LineWidth',1.5);
+
+grid on;
+
+xlabel('SNR (dB)');
+ylabel('Bit Error Rate (BER)');
+
+title('NOMA and OFDMA Performance Comparison');
+
+legend('NOMA Far User','NOMA Near User with SIC', ...
+       'OFDMA Benchmark','Location','best');
+
+ylim([1e-5 1]);
+hold off;
