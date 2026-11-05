@@ -1,0 +1,73 @@
+
+clear;
+clc;
+close all;
+
+% Cellular network parameters
+cellRadiusKm = 0.5;
+radiusM = cellRadiusKm * 1000;
+
+% Centre-to-centre distance between adjacent hexagonal cells
+separationM = sqrt(3) * radiusM;
+
+% Mobile user moves from base station 1 to base station 2
+xMeters = linspace(0, separationM, 201);
+
+% Distance from mobile user to each base station
+minimumDistanceM = 20;
+
+distance1M = max(abs(xMeters), minimumDistanceM);
+distance2M = max(abs(xMeters - separationM), minimumDistanceM);
+
+% Path-loss model parameters
+transmitPowerdBm = 30;
+pathLossAt1m_dB = 40;
+pathLossExponent = 3.5;
+
+% Calculate received signal power
+receivedPower1dBm = transmitPowerdBm - pathLossAt1m_dB ...
+    - 10 * pathLossExponent .* log10(distance1M);
+
+receivedPower2dBm = transmitPowerdBm - pathLossAt1m_dB ...
+    - 10 * pathLossExponent .* log10(distance2M);
+
+% Determine handoff position
+handoffIndex = find(receivedPower2dBm >= receivedPower1dBm, ...
+    1, 'first');
+
+if isempty(handoffIndex)
+    handoffPositionM = NaN;
+    fprintf('Handoff position not found.\n');
+else
+    handoffPositionM = xMeters(handoffIndex);
+
+    fprintf('Estimated handoff position: %.1f m from base station 1\n', ...
+        handoffPositionM);
+end
+
+% Plot received signal strength
+figure;
+
+plot(xMeters / 1000, receivedPower1dBm, ...
+    'b', 'LineWidth', 1.5);
+
+hold on;
+
+plot(xMeters / 1000, receivedPower2dBm, ...
+    'r', 'LineWidth', 1.5);
+
+if ~isnan(handoffPositionM)
+    xline(handoffPositionM / 1000, '--k', ...
+        'Estimated handoff');
+end
+
+xlabel('Mobile-user position (km)');
+ylabel('Estimated received power (dBm)');
+
+title('Received Signal Strength Between Adjacent Cells');
+
+legend('Base station 1', 'Base station 2', ...
+    'Location', 'best');
+
+grid on;
+hold off;
