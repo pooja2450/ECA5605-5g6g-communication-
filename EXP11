@@ -1,0 +1,201 @@
+
+clc;
+clear;
+close all;
+
+%% 1. Input Parameters
+
+rng(42);
+
+N = 64;
+M = 12;
+N_cp = 16;
+K_fbmc = 4;
+N_sym = 100;
+
+active_idx = (N/2-M/2+1):(N/2+M/2);
+subcarrier = -M/2:M/2-1;
+
+%% 2. QPSK Data Generation
+
+num_bits_per_sym = M*2;
+
+data_bits = randi([0 1],num_bits_per_sym,N_sym);
+
+qam_mod = zeros(M,N_sym);
+
+for s = 1:N_sym
+    for m = 1:M
+
+        b_idx = (m-1)*2+1;
+
+        real_part = 1-2*data_bits(b_idx,s);
+        imag_part = 1-2*data_bits(b_idx+1,s);
+
+        qam_mod(m,s) = ...
+            (real_part+1i*imag_part)/sqrt(2);
+
+    end
+end
+
+%% 3. OFDM Waveform Generation
+
+ofdm_tx_sig = [];
+
+for s = 1:N_sym
+
+    Xcentered = zeros(N,1);
+
+    Xcentered(active_idx) = qam_mod(:,s);
+
+    % Correct centered subcarrier mapping
+    time_sym = ifft(ifftshift(Xcentered))*sqrt(N);
+
+    % Add cyclic prefix
+    cp_part = time_sym(end-N_cp+1:end);
+
+    ofdm_tx_sig = [ofdm_tx_sig; cp_part; time_sym];
+
+end
+
+%% 4. FBMC Prototype Filter
+
+H1 = 0.97195983;
+H2 = 0.70710678;
+H3 = 0.23514752;
+
+g = zeros(1,K_fbmc*N);
+
+for t = 0:(K_fbmc*N-1)
+
+    g(t+1) = 1 ...
+        - 2*H1*cos(2*pi*t/(K_fbmc*N)) ...
+        + 2*H2*cos(4*pi*t/(K_fbmc*N)) ...
+        - 2*H3*cos(6*pi*t/(K_fbmc*N));
+
+end
+
+g = g/sqrt(sum(g.^2));
+
+%% 5. FBMC OQAM Waveform Generation
+
+fbmc_tx_sig = zeros(N*N_sym+K_fbmc*N,1);
+
+t_arr = 0:(K_fbmc*N-1);
+
+for s = 1:N_sym
+
+    for m = 1:M
+
+        % Signed subcarrier index
+        k = subcarrier(m);
+
+        sym_data = qam_mod(m,s);
+
+        r_data = real(sym_data);
+        i_data = imag(sym_data);
+
+        % OQAM phase offsets
+        phase_r = exp(1i*pi*k*(0-(K_fbmc-1)/2));
+
+        phase_i = 1i*exp(1i*pi*k*(N/2-(K_fbmc-1)/2));
+
+        carrier = exp(1i*2*pi*k*t_arr/N);
+
+        carrier_r = carrier*phase_r;
+        carrier_i = carrier*phase_i;
+
+        % Real component
+        shift_r = (s-1)*N+1;
+
+        % Imaginary component
+        shift_i = (s-1)*N+N/2+1;
+
+        fbmc_tx_sig(shift_r:shift_r+K_fbmc*N-1) = ...
+            fbmc_tx_sig(shift_r:shift_r+K_fbmc*N-1) + ...
+            (r_data*g.*carrier_r).';
+
+        fbmc_tx_sig(shift_i:shift_i+K_fbmc*N-1) = ...
+            fbmc_tx_sig(shift_i:shift_i+K_fbmc*N-1) + ...
+            (i_data*g.*carrier_i).';
+
+    end
+end
+
+%% 6. OFDM PAPR Calculation
+
+ofdm_papr_vals = zeros(N_sym,1);
+
+for s = 1:N_sym
+
+    start_idx = (s-1)*(N+N_cp)+N_cp+1;
+
+    seg = ofdm_tx_sig(start_idx:start_idx+N-1);
+
+    ofdm_papr_vals(s) = ...
+        max(abs(seg).^2)/mean(abs(seg).^2);
+
+end
+
+max_ofdm_papr = 10*log10(max(ofdm_papr_vals));
+
+%% 7. FBMC PAPR Calculation
+
+fbmc_papr_vals = zeros(N_sym,1);
+
+for s = 1:N_sym
+
+    start_idx = (s-1)*N+1;
+
+    seg = fbmc_tx_sig(start_idx:start_idx+N-1);
+
+    if mean(abs(seg).^2)>0
+
+        fbmc_papr_vals(s) = ...
+            max(abs(seg).^2)/mean(abs(seg).^2);
+
+    end
+
+end
+
+max_fbmc_papr = 10*log10(max(fbmc_papr_vals));
+
+%% 8. Display Results
+
+fprintf('\nOFDM AND FBMC PERFORMANCE RESULTS\n');
+fprintf('=================================\n');
+
+fprintf('OFDM Maximum PAPR : %.3f dB\n',max_ofdm_papr);
+
+fprintf('FBMC Maximum PAPR : %.3f dB\n',max_fbmc_papr);
+
+%% 9. Power Spectral Density
+
+[psd_ofdm,f_ofdm] = periodogram( ...
+    ofdm_tx_sig,[],2048,1,'centered');
+
+[psd_fbmc,f_fbmc] = periodogram( ...
+    fbmc_tx_sig,[],2048,1,'centered');
+
+figure('Name','OFDM vs FBMC PSD');
+
+plot(f_ofdm,10*log10(psd_ofdm/max(psd_ofdm)+eps), ...
+    'r','LineWidth',1.5);
+
+hold on;
+
+plot(f_fbmc,10*log10(psd_fbmc/max(psd_fbmc)+eps), ...
+    'b','LineWidth',1.5);
+
+grid on;
+
+xlabel('Normalized Frequency (cycles/sample)');
+ylabel('Normalized PSD (dB)');
+
+title('PSD Comparison: OFDM vs FBMC');
+
+legend('OFDM','FBMC','Location','southoutside');
+
+ylim([-80 5]);
+
+hold off;
