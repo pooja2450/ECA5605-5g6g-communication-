@@ -1,0 +1,37 @@
+
+clear;
+clc;
+close all;
+
+% Total geographical study area
+studyAreaKm2 = 4.0;
+
+% Different cell radii in kilometres
+cellRadiiKm = [1.00, 0.75, 0.50];
+
+% Area of a regular hexagonal cell
+cellAreaKm2 = (3 * sqrt(3) / 2) .* cellRadiiKm.^2;
+
+% Estimate number of cells required
+estimatedCells = ceil(studyAreaKm2 ./ cellAreaKm2);
+
+% Create comparison table
+results = table(cellRadiiKm', cellAreaKm2', estimatedCells', ...
+    'VariableNames', {'CellRadius_km', 'CellArea_km2', ...
+    'EstimatedNumberOfCells'});
+
+% Display results
+disp('Estimated cells required:');
+disp(results);
+
+% Plot cell radius versus number of cells
+figure;
+
+bar(cellRadiiKm, estimatedCells, 0.6);
+
+xlabel('Cell radius (km)');
+ylabel('Estimated number of cells');
+
+title('Cell Radius versus Estimated Number of Cells');
+
+grid on;
