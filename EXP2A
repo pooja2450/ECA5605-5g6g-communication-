@@ -1,0 +1,62 @@
+
+clear;
+clc;
+close all;
+
+% Cell radius in kilometres
+cellRadiusKm = 0.5;
+
+% Axial coordinates for central cell and six neighbours
+axial = [
+     0,  0;
+     1,  0;
+     1, -1;
+     0, -1;
+    -1,  0;
+    -1,  1;
+     0,  1
+];
+
+% Convert axial coordinates into Cartesian positions
+xCenter = sqrt(3) * cellRadiusKm .* ...
+    (axial(:,1) + axial(:,2)/2);
+
+yCenter = 1.5 * cellRadiusKm .* axial(:,2);
+
+% Hexagon vertex angles
+angle = deg2rad(30:60:330);
+
+% Create figure
+figure;
+hold on;
+
+% Draw seven hexagonal cells
+for k = 1:length(xCenter)
+
+    xVertex = xCenter(k) + ...
+        cellRadiusKm * cos(angle);
+
+    yVertex = yCenter(k) + ...
+        cellRadiusKm * sin(angle);
+
+    patch(xVertex, yVertex, [0.80 0.90 1.00], ...
+        'EdgeColor', [0.10 0.25 0.50], ...
+        'LineWidth', 1.5);
+
+    text(xCenter(k), yCenter(k), ...
+        sprintf('Cell %d', k), ...
+        'HorizontalAlignment', 'center', ...
+        'FontWeight', 'bold');
+end
+
+% Graph formatting
+axis equal;
+grid on;
+
+xlabel('Horizontal distance (km)');
+ylabel('Vertical distance (km)');
+
+title(sprintf('Adjacent Hexagonal Cells (Radius = %.2f km)', ...
+    cellRadiusKm));
+
+hold off;
