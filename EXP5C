@@ -1,0 +1,29 @@
+
+clc;
+clear;
+close all;
+
+% Carrier bandwidths in MHz
+BW = [5 10 15 20];
+
+% Spectral efficiency
+SE = 4;  % bits/s/Hz
+
+% Calculate estimated throughput
+TP = BW .* SE;
+
+% Display results
+disp('Bandwidth (MHz)   Throughput (Mbps)');
+disp([BW' TP']);
+
+% Plot throughput versus bandwidth
+figure;
+
+plot(BW, TP, 'o-', 'LineWidth', 2);
+
+grid on;
+
+xlabel('Carrier Bandwidth (MHz)');
+ylabel('Estimated Throughput (Mbps)');
+
+title('Throughput vs Component Carrier Bandwidth');
