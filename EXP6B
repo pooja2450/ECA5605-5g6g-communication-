@@ -1,0 +1,54 @@
+
+clc;
+clear;
+close all;
+
+% SNR values in dB
+SNR_dB = 0:2:20;
+
+% Initialize reliability array
+Reliability = zeros(size(SNR_dB));
+
+% Simulation loop
+for k = 1:length(SNR_dB)
+
+    N = 10000;
+
+    % Generate random binary data
+    bits = randi([0 1], N, 1);
+
+    % BPSK modulation
+    tx = 2*bits - 1;
+
+    % Convert SNR from dB to linear
+    snrLin = 10^(SNR_dB(k)/10);
+
+    % Add AWGN noise
+    noise = randn(N,1)/sqrt(2*snrLin);
+
+    rx = tx + noise;
+
+    % Demodulation
+    bhat = real(rx) > 0;
+
+    % Calculate BER
+    BER = mean(bhat ~= bits);
+
+    % Calculate reliability
+    Reliability(k) = 1 - BER;
+
+end
+
+% Plot communication reliability
+figure;
+
+plot(SNR_dB, Reliability, 'o-', 'LineWidth', 2);
+
+grid on;
+
+xlabel('SNR (dB)');
+ylabel('Reliability (1-BER)');
+
+title('Communication Reliability vs SNR');
+
+ylim([0.9 1.005]);
